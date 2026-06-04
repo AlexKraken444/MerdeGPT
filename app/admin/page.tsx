@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Pending = {
   chatId: string;
   content: string;
   timestamp: number;
 };
+
+type Mode = "text" | "draw";
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
@@ -17,6 +19,7 @@ export default function AdminPage() {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [lastError, setLastError] = useState("");
+  const [mode, setMode] = useState<Mode>("text");
 
   // restore session
   useEffect(() => {
@@ -123,6 +126,39 @@ export default function AdminPage() {
       }
       setReply("");
       setSelected(null);
+      fetchPending();
+    } catch (err) {
+      alert("Сетевая ошибка");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function sendImage(dataUrl: string, caption: string) {
+    if (!selected || sending) return;
+    setSending(true);
+    try {
+      const res = await fetch("/api/admin/answer", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-admin-password": encodeURIComponent(password),
+        },
+        body: JSON.stringify({
+          chatId: selected.chatId,
+          content: caption.trim(),
+          image: dataUrl,
+          questionTimestamp: selected.timestamp,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert("Ошибка: " + (data.error ?? res.statusText));
+        return;
+      }
+      setReply("");
+      setSelected(null);
+      setMode("text");
       fetchPending();
     } catch (err) {
       alert("Сетевая ошибка");
@@ -251,41 +287,64 @@ export default function AdminPage() {
                 {selected.content}
               </div>
             </div>
-            <form
-              onSubmit={sendAnswer}
-              className="flex flex-1 flex-col px-6 py-4"
-            >
-              <label className="mb-2 text-xs uppercase tracking-wide text-gray-500">
-                Ответ (отправится прямо в чат пользователя)
-              </label>
-              <textarea
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    (e.ctrlKey || e.metaKey)
-                  ) {
-                    e.preventDefault();
-                    sendAnswer(e as unknown as React.FormEvent);
-                  }
-                }}
-                placeholder="Пиши как будто ты ИИ…"
-                className="flex-1 resize-none rounded-xl border border-merde-border bg-merde-panel p-4 text-sm leading-relaxed outline-none focus:border-merde-accent"
-              />
-              <div className="mt-3 flex items-center justify-between">
-                <div className="text-xs text-gray-500">
-                  Ctrl/⌘+Enter — отправить
+            <div className="flex gap-2 border-b border-merde-border px-6 pt-3">
+              <button
+                onClick={() => setMode("text")}
+                className={`rounded-t-lg px-4 py-2 text-sm transition ${
+                  mode === "text"
+                    ? "bg-merde-panel text-white"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                💬 Текстом
+              </button>
+              <button
+                onClick={() => setMode("draw")}
+                className={`rounded-t-lg px-4 py-2 text-sm transition ${
+                  mode === "draw"
+                    ? "bg-merde-panel text-white"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                🎨 Рисунком
+              </button>
+            </div>
+            {mode === "text" ? (
+              <form
+                onSubmit={sendAnswer}
+                className="flex flex-1 flex-col px-6 py-4"
+              >
+                <label className="mb-2 text-xs uppercase tracking-wide text-gray-500">
+                  Ответ (отправится прямо в чат пользователя)
+                </label>
+                <textarea
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      sendAnswer(e as unknown as React.FormEvent);
+                    }
+                  }}
+                  placeholder="Пиши как будто ты ИИ…"
+                  className="flex-1 resize-none rounded-xl border border-merde-border bg-merde-panel p-4 text-sm leading-relaxed outline-none focus:border-merde-accent"
+                />
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="text-xs text-gray-500">
+                    Ctrl/⌘+Enter — отправить
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={sending || !reply.trim()}
+                    className="rounded-lg bg-merde-accent px-4 py-2 text-sm font-medium hover:bg-merde-accentHover disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {sending ? "Отправка…" : "Отправить ответ"}
+                  </button>
                 </div>
-                <button
-                  type="submit"
-                  disabled={sending || !reply.trim()}
-                  className="rounded-lg bg-merde-accent px-4 py-2 text-sm font-medium hover:bg-merde-accentHover disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {sending ? "Отправка…" : "Отправить ответ"}
-                </button>
-              </div>
-            </form>
+              </form>
+            ) : (
+              <DrawingPanel onSend={sendImage} sending={sending} />
+            )}
           </>
         )}
       </main>
@@ -300,4 +359,219 @@ function formatTime(ts: number): string {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+const PRESET_COLORS = [
+  "#ffffff",
+  "#000000",
+  "#ef4444",
+  "#f97316",
+  "#eab308",
+  "#22c55e",
+  "#06b6d4",
+  "#3b82f6",
+  "#a855f7",
+  "#ec4899",
+];
+const BG_COLOR = "#0a0a0f";
+
+function DrawingPanel({
+  onSend,
+  sending,
+}: {
+  onSend: (dataUrl: string, caption: string) => void;
+  sending: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [color, setColor] = useState<string>("#ffffff");
+  const [size, setSize] = useState<number>(4);
+  const [erasing, setErasing] = useState<boolean>(false);
+  const [caption, setCaption] = useState<string>("");
+  const drawing = useRef(false);
+  const lastPoint = useRef<{ x: number; y: number } | null>(null);
+
+  // Залить фон при первом монтировании
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  function getPos(
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ): { x: number; y: number } | null {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    let clientX: number;
+    let clientY: number;
+    if ("touches" in e) {
+      if (e.touches.length === 0) return null;
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  }
+
+  function start(
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) {
+    drawing.current = true;
+    lastPoint.current = getPos(e);
+    // нарисуем точку при простом клике
+    const ctx = canvasRef.current?.getContext("2d");
+    const p = lastPoint.current;
+    if (ctx && p) {
+      ctx.fillStyle = erasing ? BG_COLOR : color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function move(
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) {
+    if (!drawing.current) return;
+    if ("touches" in e) e.preventDefault();
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    const point = getPos(e);
+    if (!point) return;
+    if (lastPoint.current) {
+      ctx.strokeStyle = erasing ? BG_COLOR : color;
+      ctx.lineWidth = size;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
+      ctx.lineTo(point.x, point.y);
+      ctx.stroke();
+    }
+    lastPoint.current = point;
+  }
+
+  function end() {
+    drawing.current = false;
+    lastPoint.current = null;
+  }
+
+  function clear() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function send() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // PNG получается тяжелее; для большинства рисунков JPEG q=0.85 заметно компактнее.
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    onSend(dataUrl, caption);
+    setCaption("");
+    clear();
+  }
+
+  return (
+    <div className="flex flex-1 flex-col gap-3 px-6 py-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-merde-border bg-merde-panel p-3">
+        <span className="text-xs uppercase text-gray-500">Цвет</span>
+        {PRESET_COLORS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => {
+              setColor(c);
+              setErasing(false);
+            }}
+            className={`h-7 w-7 rounded-full border-2 transition ${
+              !erasing && color === c
+                ? "border-white scale-110"
+                : "border-merde-border"
+            }`}
+            style={{ background: c }}
+            title={c}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={() => setErasing((v) => !v)}
+          className={`ml-2 rounded-lg border px-3 py-1 text-xs transition ${
+            erasing
+              ? "border-white bg-white text-black"
+              : "border-merde-border text-gray-300 hover:bg-merde-bg"
+          }`}
+        >
+          🩹 Ластик
+        </button>
+        <div className="mx-3 h-6 w-px bg-merde-border" />
+        <span className="text-xs uppercase text-gray-500">Размер</span>
+        <input
+          type="range"
+          min={1}
+          max={40}
+          value={size}
+          onChange={(e) => setSize(Number(e.target.value))}
+          className="w-32"
+        />
+        <span className="w-8 text-xs text-gray-400">{size}px</span>
+        <button
+          type="button"
+          onClick={clear}
+          className="ml-auto rounded-lg border border-merde-border px-3 py-1 text-xs text-gray-300 hover:bg-merde-bg"
+        >
+          🗑️ Очистить
+        </button>
+      </div>
+
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={560}
+        onMouseDown={start}
+        onMouseMove={move}
+        onMouseUp={end}
+        onMouseLeave={end}
+        onTouchStart={start}
+        onTouchMove={move}
+        onTouchEnd={end}
+        className="block w-full cursor-crosshair touch-none rounded-xl border border-merde-border bg-merde-bg"
+        style={{ aspectRatio: "10 / 7" }}
+      />
+
+      <input
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
+        placeholder="Подпись к картинке (опционально, например «вот ваш кот»)"
+        className="rounded-lg border border-merde-border bg-merde-panel px-3 py-2 text-sm outline-none focus:border-merde-accent"
+      />
+
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-gray-500">
+          Можно рисовать мышкой или пальцем
+        </div>
+        <button
+          type="button"
+          onClick={send}
+          disabled={sending}
+          className="rounded-lg bg-merde-accent px-4 py-2 text-sm font-medium hover:bg-merde-accentHover disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {sending ? "Отправка…" : "Отправить рисунок"}
+        </button>
+      </div>
+    </div>
+  );
 }

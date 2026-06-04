@@ -3,6 +3,8 @@ import { Redis } from "@upstash/redis";
 export type Message = {
   role: "user" | "assistant";
   content: string;
+  /** base64 data URL для картинки (PNG/JPEG). Опционально. */
+  image?: string;
   timestamp: number;
 };
 

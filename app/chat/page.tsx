@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Message = {
   role: "user" | "assistant";
   content: string;
+  image?: string;
   timestamp: number;
 };
 
@@ -255,9 +256,19 @@ function MessageBubble({ message }: { message: Message }) {
         <div className="text-xs font-medium text-gray-400">
           {isUser ? "Вы" : "MerdeGPT"}
         </div>
-        <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-100">
-          {message.content}
-        </div>
+        {message.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={message.image}
+            alt="Сгенерированное изображение"
+            className="mt-2 max-w-md rounded-lg border border-merde-border"
+          />
+        )}
+        {message.content && (
+          <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-100">
+            {message.content}
+          </div>
+        )}
       </div>
     </div>
   );

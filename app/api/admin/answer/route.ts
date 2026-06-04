@@ -26,11 +26,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const chatId = String(body?.chatId ?? "").trim();
     const content = String(body?.content ?? "").trim();
+    const image =
+      typeof body?.image === "string" && body.image.startsWith("data:image/")
+        ? (body.image as string)
+        : undefined;
     const questionTimestamp = Number(body?.questionTimestamp);
 
-    if (!chatId || !content) {
+    if (!chatId || (!content && !image)) {
       return NextResponse.json(
-        { error: "chatId и content обязательны" },
+        { error: "chatId и content или image обязательны" },
+        { status: 400 }
+      );
+    }
+    if (image && image.length > 2_500_000) {
+      // ~1.8 МБ файла в base64
+      return NextResponse.json(
+        { error: "Картинка слишком большая (>1.8MB). Уменьши/упрости рисунок." },
         { status: 400 }
       );
     }
@@ -38,6 +49,7 @@ export async function POST(req: NextRequest) {
     await appendMessage(chatId, {
       role: "assistant",
       content,
+      ...(image ? { image } : {}),
       timestamp: Date.now(),
     });
     if (Number.isFinite(questionTimestamp)) {
