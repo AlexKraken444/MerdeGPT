@@ -117,6 +117,8 @@ export default function AdminPage() {
           chatId: selected.chatId,
           content: reply.trim(),
           questionTimestamp: selected.timestamp,
+          replyToContent: selected.content,
+          replyToTimestamp: selected.timestamp,
         }),
       });
       if (!res.ok) {
@@ -149,6 +151,8 @@ export default function AdminPage() {
           content: caption.trim(),
           image: dataUrl,
           questionTimestamp: selected.timestamp,
+          replyToContent: selected.content,
+          replyToTimestamp: selected.timestamp,
         }),
       });
       if (!res.ok) {

@@ -7,6 +7,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   image?: string;
+  replyTo?: { content: string; timestamp: number };
   timestamp: number;
 };
 
@@ -256,6 +257,16 @@ function MessageBubble({ message }: { message: Message }) {
         <div className="text-xs font-medium text-gray-400">
           {isUser ? "Вы" : "MerdeGPT"}
         </div>
+        {!isUser && message.replyTo && (
+          <div className="mt-2 max-w-xl rounded-r-lg border-l-2 border-merde-accent bg-merde-panel/60 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-merde-accent/80">
+              Ответ на ваш вопрос
+            </div>
+            <div className="mt-0.5 line-clamp-2 text-xs text-gray-400">
+              {message.replyTo.content}
+            </div>
+          </div>
+        )}
         {message.image && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -265,7 +276,7 @@ function MessageBubble({ message }: { message: Message }) {
           />
         )}
         {message.content && (
-          <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-100">
+          <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-100">
             {message.content}
           </div>
         )}

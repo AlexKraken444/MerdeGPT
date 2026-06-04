@@ -31,6 +31,12 @@ export async function POST(req: NextRequest) {
         ? (body.image as string)
         : undefined;
     const questionTimestamp = Number(body?.questionTimestamp);
+    const replyToContent = String(body?.replyToContent ?? "").trim();
+    const replyToTimestamp = Number(body?.replyToTimestamp);
+    const replyTo =
+      replyToContent && Number.isFinite(replyToTimestamp)
+        ? { content: replyToContent, timestamp: replyToTimestamp }
+        : undefined;
 
     if (!chatId || (!content && !image)) {
       return NextResponse.json(
@@ -50,6 +56,7 @@ export async function POST(req: NextRequest) {
       role: "assistant",
       content,
       ...(image ? { image } : {}),
+      ...(replyTo ? { replyTo } : {}),
       timestamp: Date.now(),
     });
     if (Number.isFinite(questionTimestamp)) {

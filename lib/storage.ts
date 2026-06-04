@@ -5,6 +5,8 @@ export type Message = {
   content: string;
   /** base64 data URL для картинки (PNG/JPEG). Опционально. */
   image?: string;
+  /** Цитата вопроса, на который отвечает MerdeGPT. */
+  replyTo?: { content: string; timestamp: number };
   timestamp: number;
 };
 
