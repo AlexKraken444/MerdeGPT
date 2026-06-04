@@ -263,9 +263,6 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-merde-border bg-merde-panel/40">
         <div className="mx-auto max-w-6xl px-6 py-10 text-center text-sm text-gray-400">
-          <p className="mb-2">
-            © {new Date().getFullYear()} MerdeGPT Labs. Все права защищены.
-          </p>
           <p className="text-xs text-gray-500">
             Данный сайт является шуточным. Ваши вопросы могут быть показаны в моём видео :)
           </p>
