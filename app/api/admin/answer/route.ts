@@ -5,7 +5,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function checkAuth(req: NextRequest): boolean {
-  const header = req.headers.get("x-admin-password");
+  const raw = req.headers.get("x-admin-password");
+  if (!raw) return false;
+  let header = raw;
+  try {
+    header = decodeURIComponent(raw);
+  } catch {
+    // если кто-то прислал не percent-encoded — используем как есть
+  }
   const expected = process.env.ADMIN_PASSWORD;
   if (!expected) return false;
   return header === expected;

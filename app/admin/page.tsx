@@ -59,7 +59,7 @@ export default function AdminPage() {
   const fetchPending = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/questions", {
-        headers: { "x-admin-password": password },
+        headers: { "x-admin-password": encodeURIComponent(password) },
         cache: "no-store",
       });
       if (res.status === 401) {
@@ -108,7 +108,7 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-admin-password": password,
+          "x-admin-password": encodeURIComponent(password),
         },
         body: JSON.stringify({
           chatId: selected.chatId,
