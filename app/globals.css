@@ -36,3 +36,11 @@ body {
 }
 .dot:nth-child(2) { animation-delay: 0.2s; }
 .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes caretBlink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+.caret {
+  animation: caretBlink 0.9s steps(2, start) infinite;
+}

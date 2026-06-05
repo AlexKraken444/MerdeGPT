@@ -25,6 +25,66 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [waitingForAnswer, setWaitingForAnswer] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** Сколько символов отрисовать для каждого ассистентского сообщения (по timestamp). */
+  const [revealed, setRevealed] = useState<Record<number, number>>({});
+  const animationsRef = useRef<Record<number, ReturnType<typeof setInterval>>>(
+    {}
+  );
+  const firstLoadRef = useRef(true);
+
+  const startTyping = useCallback((ts: number, content: string) => {
+    const existing = animationsRef.current[ts];
+    if (existing) clearInterval(existing);
+    setRevealed((r) => ({ ...r, [ts]: 0 }));
+    const interval = setInterval(() => {
+      setRevealed((r) => {
+        const cur = r[ts] ?? 0;
+        const next = cur + 2;
+        if (next >= content.length) {
+          clearInterval(interval);
+          delete animationsRef.current[ts];
+          return { ...r, [ts]: content.length };
+        }
+        return { ...r, [ts]: next };
+      });
+    }, 18);
+    animationsRef.current[ts] = interval;
+  }, []);
+
+  // Решаем что делать с каждым новым сообщением: показать полностью или анимировать.
+  useEffect(() => {
+    if (firstLoadRef.current && messages.length > 0) {
+      // Первая загрузка истории — показываем всё как есть, без анимации.
+      setRevealed((r) => {
+        const next = { ...r };
+        for (const m of messages) {
+          next[m.timestamp] = m.content?.length ?? 0;
+        }
+        return next;
+      });
+      firstLoadRef.current = false;
+      return;
+    }
+    for (const m of messages) {
+      if (revealed[m.timestamp] !== undefined) continue;
+      if (m.role === "assistant" && m.content) {
+        startTyping(m.timestamp, m.content);
+      } else {
+        setRevealed((r) => ({
+          ...r,
+          [m.timestamp]: m.content?.length ?? 0,
+        }));
+      }
+    }
+  }, [messages, revealed, startTyping]);
+
+  // Чистим интервалы при размонтировании.
+  useEffect(() => {
+    const animations = animationsRef.current;
+    return () => {
+      for (const id of Object.values(animations)) clearInterval(id);
+    };
+  }, []);
 
   // load/create chatId
   useEffect(() => {
@@ -65,13 +125,15 @@ export default function ChatPage() {
     return () => clearInterval(t);
   }, [chatId, fetchMessages]);
 
-  // autoscroll
+  // autoscroll — следит и за анимацией набора текста.
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({
+      top: el.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages, waitingForAnswer]);
+  }, [messages, revealed, waitingForAnswer]);
 
   async function send(e?: React.FormEvent) {
     e?.preventDefault();
@@ -111,6 +173,11 @@ export default function ChatPage() {
     setChatId(id);
     setMessages([]);
     setWaitingForAnswer(false);
+    // Сбрасываем анимации.
+    for (const tid of Object.values(animationsRef.current)) clearInterval(tid);
+    animationsRef.current = {};
+    setRevealed({});
+    firstLoadRef.current = true;
   }
 
   const isEmpty = messages.length === 0 && !waitingForAnswer;
@@ -188,7 +255,11 @@ export default function ChatPage() {
           ) : (
             <div className="mx-auto max-w-3xl px-6 py-6">
               {messages.map((m, i) => (
-                <MessageBubble key={i} message={m} />
+                <MessageBubble
+                  key={i}
+                  message={m}
+                  revealedCount={revealed[m.timestamp] ?? m.content?.length ?? 0}
+                />
               ))}
               {waitingForAnswer && (
                 <div className="mb-6 flex gap-4">
@@ -240,8 +311,20 @@ export default function ChatPage() {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({
+  message,
+  revealedCount,
+}: {
+  message: Message;
+  revealedCount: number;
+}) {
   const isUser = message.role === "user";
+  const fullLength = message.content?.length ?? 0;
+  // Юзерские сообщения всегда показываем полностью; ассистентские режем по revealedCount.
+  const shownText = isUser
+    ? message.content
+    : message.content.slice(0, revealedCount);
+  const isTyping = !isUser && fullLength > 0 && revealedCount < fullLength;
   return (
     <div className="mb-6 flex gap-4">
       <div
@@ -277,7 +360,10 @@ function MessageBubble({ message }: { message: Message }) {
         )}
         {message.content && (
           <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-100">
-            {message.content}
+            {shownText}
+            {isTyping && (
+              <span className="ml-0.5 inline-block h-4 w-[2px] -mb-0.5 align-middle bg-merde-accent caret" />
+            )}
           </div>
         )}
       </div>

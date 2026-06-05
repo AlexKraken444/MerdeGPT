@@ -10,6 +10,14 @@ type Pending = {
 
 type Mode = "text" | "draw";
 
+type HistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+  image?: string;
+  replyTo?: { content: string; timestamp: number };
+  timestamp: number;
+};
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -20,6 +28,58 @@ export default function AdminPage() {
   const [sending, setSending] = useState(false);
   const [lastError, setLastError] = useState("");
   const [mode, setMode] = useState<Mode>("text");
+  const [history, setHistory] = useState<HistoryMessage[]>([]);
+  const [soundOn, setSoundOn] = useState(true);
+
+  // Звук
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const knownPendingRef = useRef<Set<string> | null>(null);
+
+  function ensureAudioCtx(): AudioContext | null {
+    if (audioCtxRef.current) return audioCtxRef.current;
+    try {
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+      if (!Ctx) return null;
+      audioCtxRef.current = new Ctx();
+      return audioCtxRef.current;
+    } catch {
+      return null;
+    }
+  }
+
+  const beep = useCallback(() => {
+    if (!soundOn) return;
+    const ctx = ensureAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === "suspended") void ctx.resume();
+    const now = ctx.currentTime;
+    // Двухтоновый «дзынь»
+    [
+      { freq: 880, start: 0, dur: 0.12 },
+      { freq: 1320, start: 0.08, dur: 0.18 },
+    ].forEach(({ freq, start, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + start);
+      gain.gain.setValueAtTime(0.0001, now + start);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+      osc.start(now + start);
+      osc.stop(now + start + dur + 0.02);
+    });
+  }, [soundOn]);
+
+  // загрузить предпочтение по звуку
+  useEffect(() => {
+    const stored = localStorage.getItem("merde:adminSound");
+    if (stored === "off") setSoundOn(false);
+  }, []);
 
   // restore session
   useEffect(() => {
@@ -101,6 +161,56 @@ export default function AdminPage() {
     const t = setInterval(fetchPending, 2500);
     return () => clearInterval(t);
   }, [authed, fetchPending]);
+
+  // Дзынь при новых вопросах
+  useEffect(() => {
+    if (!authed) return;
+    const currentKeys = new Set(
+      pending.map((p) => `${p.chatId}:${p.timestamp}`)
+    );
+    if (knownPendingRef.current === null) {
+      // первый рендер после логина — просто запоминаем
+      knownPendingRef.current = currentKeys;
+      return;
+    }
+    let hasNew = false;
+    for (const k of currentKeys) {
+      if (!knownPendingRef.current.has(k)) {
+        hasNew = true;
+        break;
+      }
+    }
+    knownPendingRef.current = currentKeys;
+    if (hasNew) beep();
+  }, [pending, authed, beep]);
+
+  // История переписки выбранного чата
+  const fetchHistory = useCallback(async (chatId: string) => {
+    try {
+      const res = await fetch(
+        `/api/chat/messages?chatId=${encodeURIComponent(chatId)}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.messages)) {
+        setHistory(data.messages as HistoryMessage[]);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selected) {
+      setHistory([]);
+      return;
+    }
+    fetchHistory(selected.chatId);
+    // подтягиваем историю чаще, чтобы видеть новые сообщения этого чата
+    const t = setInterval(() => fetchHistory(selected.chatId), 4000);
+    return () => clearInterval(t);
+  }, [selected, fetchHistory]);
 
   async function sendAnswer(e: React.FormEvent) {
     e.preventDefault();
@@ -228,12 +338,34 @@ export default function AdminPage() {
             </div>
             <div className="text-xs text-gray-500">обновляется каждые 2.5 сек</div>
           </div>
-          <button
-            onClick={logout}
-            className="text-xs text-gray-400 hover:text-white"
-          >
-            Выйти
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              title={soundOn ? "Выключить звук" : "Включить звук"}
+              onClick={() => {
+                const next = !soundOn;
+                setSoundOn(next);
+                localStorage.setItem(
+                  "merde:adminSound",
+                  next ? "on" : "off"
+                );
+                if (next) {
+                  ensureAudioCtx();
+                  // короткий «дзынь» подтверждения
+                  setTimeout(() => beep(), 50);
+                }
+              }}
+              className="rounded-md border border-merde-border px-2 py-1 text-sm hover:bg-merde-bg"
+            >
+              {soundOn ? "🔊" : "🔇"}
+            </button>
+            <button
+              onClick={logout}
+              className="text-xs text-gray-400 hover:text-white"
+            >
+              Выйти
+            </button>
+          </div>
         </header>
         <div className="flex-1 overflow-y-auto">
           {pending.length === 0 ? (
@@ -282,9 +414,54 @@ export default function AdminPage() {
           </div>
         ) : (
           <>
+            {(() => {
+              const previous = history.filter(
+                (m) => m.timestamp < selected.timestamp
+              );
+              if (previous.length === 0) return null;
+              return (
+                <div className="border-b border-merde-border bg-merde-panel/30 px-6 py-3">
+                  <div className="mb-2 text-xs uppercase tracking-wide text-gray-500">
+                    📜 История переписки · {previous.length}
+                  </div>
+                  <div className="max-h-48 space-y-1.5 overflow-y-auto pr-2">
+                    {previous.map((m, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg border border-merde-border/60 bg-merde-bg/40 px-3 py-1.5 text-xs"
+                      >
+                        <div className="mb-0.5 flex items-center gap-2">
+                          <span
+                            className={
+                              m.role === "user"
+                                ? "font-medium text-gray-400"
+                                : "font-medium text-merde-accent"
+                            }
+                          >
+                            {m.role === "user" ? "Юзер" : "MerdeGPT"}
+                          </span>
+                          <span className="text-[10px] text-gray-600">
+                            {formatTime(m.timestamp)}
+                          </span>
+                        </div>
+                        {m.image && (
+                          <span className="mr-1 text-gray-500">
+                            [картинка]
+                          </span>
+                        )}
+                        <span className="whitespace-pre-wrap text-gray-200">
+                          {m.content ||
+                            (m.image ? "" : "(пустое сообщение)")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="border-b border-merde-border px-6 py-4">
               <div className="text-xs text-gray-500">
-                Вопрос от chat: {selected.chatId} ·{" "}
+                Текущий вопрос · chat {selected.chatId.slice(0, 8)}… ·{" "}
                 {formatTime(selected.timestamp)}
               </div>
               <div className="mt-2 whitespace-pre-wrap rounded-xl border border-merde-border bg-merde-panel p-4 text-sm text-gray-100">
