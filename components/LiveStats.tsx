@@ -12,8 +12,8 @@ const INITIAL = {
 
 // Параметры одного тика
 const TICK_MS = 800;
-const USERS_INC_MIN = 1;
-const USERS_INC_MAX = 4; // +1..4 за 800мс
+const USERS_INC_MIN = -3;
+const USERS_INC_MAX = 5; // от -3 до +5 за 800мс — кто-то заходит, кто-то выходит
 const REQ_INC_MIN = 25;
 const REQ_INC_MAX = 180; // +25..180 за 800мс
 const COUNTRY_CHANCE = 0.003; // редкие появления новой страны
