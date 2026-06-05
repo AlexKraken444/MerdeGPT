@@ -297,6 +297,50 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Video reviews */}
+      <section id="video-reviews" className="mx-auto max-w-6xl px-6 py-24">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold md:text-4xl">Видеоотзывы</h2>
+          <p className="mt-4 text-gray-400">
+            Реальные эмоции реальных пользователей.
+          </p>
+        </div>
+        <div className="mx-auto mt-14 max-w-md">
+          <div className="overflow-hidden rounded-3xl border border-merde-border bg-merde-panel">
+            <video
+              src="/instasamka-review.mp4"
+              controls
+              preload="metadata"
+              playsInline
+              className="block w-full bg-black"
+            />
+            <div className="p-5">
+              <div className="mb-3 flex">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} filled />
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-600 text-base font-semibold">
+                  И
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-white">
+                    Инстасамка
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Артистка · ВКонтакте 8.2M
+                  </div>
+                </div>
+                <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-merde-accent/40 bg-merde-accent/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-merde-accent">
+                  Видео
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="mx-auto max-w-4xl px-6 py-24 text-center">
         <h2 className="text-3xl font-bold md:text-5xl">
