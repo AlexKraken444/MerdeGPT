@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LiveStats from "@/components/LiveStats";
 
 const advantages = [
   {
@@ -102,13 +103,6 @@ const reviews = [
   },
 ];
 
-const stats = [
-  { label: "Активных пользователей", value: "12.4M" },
-  { label: "Запросов в сутки", value: "847M" },
-  { label: "Параметров", value: "1.7T" },
-  { label: "Стран", value: "183" },
-];
-
 function Star({ filled }: { filled: boolean }) {
   return (
     <svg
@@ -185,18 +179,7 @@ export default function HomePage() {
       </section>
 
       {/* Stats */}
-      <section id="stats" className="border-y border-merde-border bg-merde-panel/40">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-6 py-12 md:grid-cols-4">
-          {stats.map((s) => (
-            <div key={s.label} className="text-center">
-              <div className="bg-gradient-to-b from-white to-gray-400 bg-clip-text text-3xl font-bold text-transparent md:text-4xl">
-                {s.value}
-              </div>
-              <div className="mt-1 text-sm text-gray-400">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <LiveStats />
 
       {/* Features */}
       <section id="features" className="mx-auto max-w-6xl px-6 py-24">
