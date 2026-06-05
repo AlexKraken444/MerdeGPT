@@ -205,6 +205,58 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Anthem */}
+      <section className="mx-auto max-w-6xl px-6 py-16">
+        <div className="mx-auto max-w-4xl overflow-hidden rounded-3xl border border-merde-border bg-gradient-to-br from-merde-panel via-merde-panel to-purple-950/40 p-8 shadow-xl shadow-purple-900/10 md:p-10">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-merde-accent/30 bg-merde-accent/10 px-3 py-1 text-xs uppercase tracking-widest text-merde-accent">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-merde-accent" />
+            Новый сингл · 2026
+          </div>
+          <div className="flex flex-col items-stretch gap-8 md:flex-row md:items-start">
+            {/* «Обложка» */}
+            <div className="relative mx-auto flex h-52 w-52 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 via-fuchsia-600 to-pink-600 shadow-2xl shadow-purple-500/40 md:mx-0">
+              <span className="text-8xl font-black leading-none text-white drop-shadow-lg">
+                M
+              </span>
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+              <div className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="ml-0.5 h-4 w-4 text-white"
+                >
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Описание + плеер */}
+            <div className="flex-1">
+              <h2 className="text-3xl font-bold md:text-4xl">Гимн MerdeGPT</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                MerdeGPT feat. MerdeGPT 4.7 · Single · 1 трек
+              </p>
+              <p className="mt-5 text-sm leading-relaxed text-gray-300">
+                В рамках творческого эксперимента команда лаборатории попросила
+                саму нейросеть написать гимн о себе. Текст, мелодия, аранжировка
+                и вокал — всё сгенерировано MerdeGPT без участия человека.
+              </p>
+              <audio
+                src="/anthem.mp3"
+                controls
+                preload="metadata"
+                className="mt-6 w-full"
+              >
+                Ваш браузер не поддерживает аудио. <a href="/anthem.mp3">Скачать гимн</a>.
+              </audio>
+              <p className="mt-3 text-xs text-gray-500">
+                🎙️ Сгенерировано моделью MerdeGPT Audio v2.1 · 47 секунд процессорного времени
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Reviews */}
       <section id="reviews" className="border-t border-merde-border bg-merde-panel/40">
         <div className="mx-auto max-w-6xl px-6 py-24">
